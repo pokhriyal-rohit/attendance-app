@@ -9,6 +9,17 @@ const {
 } = require("../controllers/authController");
 
 const router = express.Router();
+const getFrontendUrl = () => {
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "";
+  }
+
+  return "http://localhost:5173";
+};
 
 const ensureGoogleOAuthConfigured = (req, res, next) => {
   const isGoogleOAuthConfigured =
@@ -36,7 +47,10 @@ router.get(
   (req, res, next) => {
     passport.authenticate("google", (error, user) => {
       if (error || !user) {
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const frontendUrl = getFrontendUrl();
+        if (!frontendUrl) {
+          return res.status(500).json({ message: "FRONTEND_URL is not configured" });
+        }
         return res.redirect(`${frontendUrl}/oauth/callback?error=google_auth_failed`);
       }
 

@@ -1,9 +1,20 @@
 const nodemailer = require("nodemailer");
 
 const ensureSmtpConfig = () => {
-  const requiredVariables = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"];
+  const requiredVariables = [
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_FROM",
+  ];
   const missingVariables = requiredVariables.filter((name) => !process.env[name]);
   if (missingVariables.length > 0) {
+    throw new Error("SMTP configuration is missing");
+  }
+
+  const parsedPort = Number(process.env.SMTP_PORT);
+  if (!Number.isFinite(parsedPort) || parsedPort <= 0) {
     throw new Error("SMTP configuration is missing");
   }
 };

@@ -65,7 +65,17 @@ const shapeAuthResponse = (user) => {
   };
 };
 
-const getFrontendUrl = () => process.env.FRONTEND_URL || "http://localhost:5173";
+const getFrontendUrl = () => {
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "";
+  }
+
+  return "http://localhost:5173";
+};
 
 const register = async (req, res) => {
   try {
@@ -157,7 +167,10 @@ const forgotPassword = async (req, res) => {
     user.resetTokenExpiry = expiry;
     await user.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = getFrontendUrl();
+    if (!frontendUrl) {
+      return res.json({ message: FORGOT_PASSWORD_MESSAGE });
+    }
     const resetLink = `${frontendUrl}/reset-password/${rawToken}`;
 
     try {
