@@ -17,7 +17,8 @@ const DEFAULT_ZOOM = 10;
 const LIVE_ZOOM = 16;
 
 function getPolygonStyle(inside) {
-  const color = inside === true ? "#16a34a" : inside === false ? "#dc2626" : "#eab308";
+  const color =
+    inside === true ? "#16a34a" : inside === false ? "#dc2626" : "#eab308";
 
   return new Style({
     stroke: new Stroke({
@@ -39,9 +40,7 @@ const markerStyle = new Style({
 });
 
 function toValidLonLatPairs(polygonCoordinates) {
-  if (!Array.isArray(polygonCoordinates)) {
-    return [];
-  }
+  if (!Array.isArray(polygonCoordinates)) return [];
 
   return polygonCoordinates
     .map((coord) => [Number(coord?.lng), Number(coord?.lat)])
@@ -50,11 +49,16 @@ function toValidLonLatPairs(polygonCoordinates) {
         Number.isFinite(coord[0]) &&
         Number.isFinite(coord[1]) &&
         Math.abs(coord[0]) <= 180 &&
-        Math.abs(coord[1]) <= 90
+        Math.abs(coord[1]) <= 90,
     );
 }
 
-export default function MapView({ latitude, longitude, polygonCoordinates = [], inside = null }) {
+export default function MapView({
+  latitude,
+  longitude,
+  polygonCoordinates = [],
+  inside = null,
+}) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const viewRef = useRef(null);
@@ -62,10 +66,9 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
   const polygonFeatureRef = useRef(null);
   const polygonSourceRef = useRef(null);
 
+  // INIT MAP
   useEffect(() => {
-    if (mapRef.current || !mapContainerRef.current) {
-      return undefined;
-    }
+    if (mapRef.current || !mapContainerRef.current) return;
 
     const projectedDefaultCenter = fromLonLat(DEFAULT_CENTER);
 
@@ -74,16 +77,13 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     });
     markerFeature.setStyle(markerStyle);
 
-    const markerSource = new VectorSource({
-      features: [markerFeature],
-    });
-
     const markerLayer = new VectorLayer({
-      source: markerSource,
+      source: new VectorSource({
+        features: [markerFeature],
+      }),
     });
 
     const polygonSource = new VectorSource();
-
     const polygonLayer = new VectorLayer({
       source: polygonSource,
     });
@@ -97,7 +97,11 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
       target: mapContainerRef.current,
       layers: [
         new TileLayer({
-          source: new OSM(),
+          // Explicit HTTPS tile source (production safe)
+          source: new OSM({
+            url: "https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            crossOrigin: "anonymous",
+          }),
         }),
         polygonLayer,
         markerLayer,
@@ -110,6 +114,11 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     markerFeatureRef.current = markerFeature;
     polygonSourceRef.current = polygonSource;
 
+    // 🔥 Force size update (important for production)
+    setTimeout(() => {
+      map.updateSize();
+    }, 300);
+
     return () => {
       map.setTarget(null);
       mapRef.current = null;
@@ -120,10 +129,9 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     };
   }, []);
 
+  // UPDATE MARKER POSITION
   useEffect(() => {
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return;
-    }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
 
     const projectedPosition = fromLonLat([longitude, latitude]);
 
@@ -131,7 +139,7 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
       viewRef.current.animate({
         center: projectedPosition,
         zoom: LIVE_ZOOM,
-        duration: 1200,
+        duration: 800,
       });
     }
 
@@ -141,11 +149,10 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     }
   }, [latitude, longitude]);
 
+  // UPDATE POLYGON
   useEffect(() => {
     const polygonSource = polygonSourceRef.current;
-    if (!polygonSource) {
-      return;
-    }
+    if (!polygonSource) return;
 
     const lonLatPairs = toValidLonLatPairs(polygonCoordinates);
 
@@ -160,11 +167,13 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     const first = lonLatPairs[0];
     const last = lonLatPairs[lonLatPairs.length - 1];
     const closedPairs = [...lonLatPairs];
+
     if (first[0] !== last[0] || first[1] !== last[1]) {
       closedPairs.push([...first]);
     }
 
     const projectedRing = closedPairs.map((coord) => fromLonLat(coord));
+
     const polygonGeometry = new Polygon([projectedRing]);
 
     if (polygonFeatureRef.current) {
@@ -176,10 +185,21 @@ export default function MapView({ latitude, longitude, polygonCoordinates = [], 
     const polygonFeature = new Feature({
       geometry: polygonGeometry,
     });
+
     polygonFeature.setStyle(getPolygonStyle(inside));
     polygonSource.addFeature(polygonFeature);
     polygonFeatureRef.current = polygonFeature;
   }, [polygonCoordinates, inside]);
 
-  return <div ref={mapContainerRef} style={{ height: "400px", width: "100%" }} />;
+  return (
+    <div
+      ref={mapContainerRef}
+      style={{
+        height: "400px",
+        width: "100%",
+        borderRadius: "12px",
+        overflow: "hidden",
+      }}
+    />
+  );
 }
